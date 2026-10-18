@@ -2,6 +2,19 @@
 
 A Windows disk usage explorer modeled on FolderSizes. This first cut is the **explorer-like Details view**.
 
+## Download
+
+Each release on GitHub has two zips for 64-bit Windows. Unzip either one and run `FolderDiskSize.exe`; there is no installer.
+
+| Zip | Needs .NET? | Size | Pick it if |
+|---|---|---|---|
+| `FolderDiskSize-<version>-win-x64-standalone.zip` | No. .NET is built in. | About 55 MB | You just want it to run on any 64-bit Windows 10 or 11 PC. |
+| `FolderDiskSize-<version>-win-x64-requires-dotnet.zip` | Yes: the **.NET 10 Desktop Runtime (x64)** | About 0.5 MB | You already have .NET 10 installed, or don't mind installing it once. |
+
+To get the runtime for the smaller zip, open the [.NET 10 download page](https://dotnet.microsoft.com/download/dotnet/10.0) and, under **.NET Desktop Runtime 10.0**, download the **Windows x64** installer. The plain ".NET Runtime" and "ASP.NET Core Runtime" don't include WPF, so the app won't start with only those. If the runtime is missing, Windows shows a message with a download link when you start the app.
+
+Each zip has a `.sha256` file next to it with its SHA-256 checksum.
+
 ## What's here
 
 | Project | Target | What it does |
@@ -16,7 +29,7 @@ A Windows disk usage explorer modeled on FolderSizes. This first cut is the **ex
 dotnet run --project src/FolderDiskSize.App
 ```
 
-Needs the .NET 10 SDK. Open `FolderDiskSize.slnx` in Visual Studio 2026 or Rider to debug.
+Building needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), which includes the runtime. Open `FolderDiskSize.slnx` in Visual Studio 2026 or Rider to debug.
 
 ## How the view works
 
