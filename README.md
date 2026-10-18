@@ -21,11 +21,13 @@ Needs the .NET 10 SDK. Open `FolderDiskSize.slnx` in Visual Studio 2026 or Rider
 ## Make a release
 
 1. Set the version in `Directory.Build.props` (`<Version>`), for example `0.2.0`.
-2. Run `.\publish.ps1` from the repo root in PowerShell. It runs the tests, then publishes with the `win-x64` profile (`src/FolderDiskSize.App/Properties/PublishProfiles/win-x64.pubxml`): one self-contained `FolderDiskSize.exe` that runs without .NET installed.
-3. Output goes to `artifacts\` (ignored by git): the `FolderDiskSize-<version>-win-x64` folder with the exe, a zip of it, and the zip's SHA-256.
-4. Start the exe from that folder once to check it, then commit, tag (`git tag v0.2.0`) and attach the zip to a GitHub release.
+2. Run `powershell -ExecutionPolicy Bypass -File .\publish.ps1` from the repo root. It runs the tests, then publishes two builds with the profiles in `src/FolderDiskSize.App/Properties/PublishProfiles`:
+   - `FolderDiskSize-<version>-win-x64-standalone.zip` (about 56 MB): self-contained, runs on any 64-bit Windows PC without .NET installed.
+   - `FolderDiskSize-<version>-win-x64-requires-dotnet.zip` (about 0.5 MB): needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0); if it's missing, Windows offers the download when the app starts.
+3. Output goes to `artifacts\` (ignored by git): each build's folder with its exe, a zip of it, and the zip's SHA-256.
+4. Start each exe once to check it, then commit, tag (`git tag v0.2.0`, `git push origin v0.2.0`) and create a GitHub release from the tag with both zips attached. With the GitHub CLI: `gh release create v0.2.0 (Get-ChildItem artifacts\*.zip) --generate-notes`.
 
-`.\publish.ps1 -Version 0.2.0` overrides the version for one build; `-SkipTests` skips the tests. The exe isn't code-signed yet, so SmartScreen will warn on other PCs.
+`-Version 0.2.0` overrides the version for one build; `-SkipTests` skips the tests. The exes aren't code-signed, so SmartScreen will warn on other PCs.
 
 ## How the view works
 

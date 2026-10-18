@@ -1,7 +1,9 @@
 <#
 .SYNOPSIS
-  Builds a release: runs the tests, publishes a self-contained single-file
-  FolderDiskSize.exe for win-x64 and zips it.
+  Builds a release: runs the tests, then publishes two builds of FolderDiskSize.exe for win-x64
+  and zips each one:
+    - standalone:       self-contained, runs on any 64-bit Windows PC (large, about 60 MB)
+    - requires-dotnet:  small, needs the .NET 10 Desktop Runtime installed
 
 .EXAMPLE
   .\publish.ps1                  # version from Directory.Build.props
@@ -22,26 +24,32 @@ if (-not $Version) {
 }
 if (-not $Version) { throw 'No version given and none found in Directory.Build.props.' }
 
-$out = Join-Path $root "artifacts\FolderDiskSize-$Version-win-x64"
-$zip = "$out.zip"
-
 if (-not $SkipTests) {
     dotnet test (Join-Path $root 'FolderDiskSize.slnx') -c Release
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 }
 
-if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-if (Test-Path $zip) { Remove-Item $zip -Force }
+# Publish profile (src/FolderDiskSize.App/Properties/PublishProfiles) -> suffix of the output name.
+$builds = [ordered]@{
+    'win-x64'           = 'win-x64-standalone'
+    'win-x64-framework' = 'win-x64-requires-dotnet'
+}
 
-dotnet publish $app -p:PublishProfile=win-x64 -p:Version=$Version -o $out
-if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
+$results = foreach ($name in $builds.Keys) {
+    $out = Join-Path $root "artifacts\FolderDiskSize-$Version-$($builds[$name])"
+    $zip = "$out.zip"
+    if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+    if (Test-Path $zip) { Remove-Item $zip -Force }
 
-Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
-$hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-"$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+    dotnet publish $app -p:PublishProfile=$name -p:Version=$Version -o $out
+    if ($LASTEXITCODE -ne 0) { throw "Publish failed for profile $name." }
+
+    Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
+    $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+    [pscustomobject]@{ Zip = Split-Path $zip -Leaf; MB = [math]::Round((Get-Item $zip).Length / 1MB, 1); SHA256 = $hash }
+}
 
 Write-Host ''
-Write-Host "Version $Version"
-Write-Host "Exe:     $(Join-Path $out 'FolderDiskSize.exe')"
-Write-Host "Zip:     $zip"
-Write-Host "SHA256:  $hash"
+Write-Host "Version $Version, zips in $(Join-Path $root 'artifacts'):"
+$results | Format-Table -AutoSize
