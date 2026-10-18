@@ -19,6 +19,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly Stack<string> _back = new();
     private readonly Stack<string> _forward = new();
     private CancellationTokenSource? _scanCts;
+    private FolderTreeItemViewModel? _selectedTreeItem;
+    private bool _syncingTree;
     private string _sortMember = nameof(EntryViewModel.Size);
     private ListSortDirection _sortDirection = ListSortDirection.Descending;
 
@@ -96,16 +98,22 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task GoUpAsync()
     {
-        var parent = CurrentNode?.Parent?.FullPath ?? (CurrentNode is null ? null : Path.GetDirectoryName(CurrentNode.FullPath));
+        var parent = ParentPath();
         return parent is null ? Task.CompletedTask : GoToAsync(parent, recordHistory: true);
     }
 
+    /// <summary>
+    /// Returns to the previous folder, like Explorer's back button. With no history yet
+    /// (for example right after picking a folder in the tree), goes to the parent folder instead.
+    /// </summary>
     [RelayCommand]
     private Task GoBackAsync()
     {
-        if (_back.Count == 0 || CurrentNode is null) return Task.CompletedTask;
+        if (CurrentNode is null) return Task.CompletedTask;
+        var target = _back.Count > 0 ? _back.Pop() : ParentPath();
+        if (target is null) return Task.CompletedTask;
         _forward.Push(CurrentNode.FullPath);
-        return GoToAsync(_back.Pop(), recordHistory: false);
+        return GoToAsync(target, recordHistory: false);
     }
 
     [RelayCommand]
@@ -174,6 +182,51 @@ public sealed partial class MainViewModel : ObservableObject
         Address = node.FullPath;
         SelectedEntry = null;
         Entries = Sort(node.Children.Select(c => new EntryViewModel(c)));
+        SelectInTree(node.FullPath);
+    }
+
+    /// <summary>
+    /// Expands the Folder Browser down to <paramref name="path"/> and selects it, so the tree follows
+    /// navigation from back/forward, the grid and the address bar.
+    /// </summary>
+    private void SelectInTree(string path)
+    {
+        var target = PathUtil.Normalize(path);
+        FolderTreeItemViewModel? match = null;
+        IEnumerable<FolderTreeItemViewModel> level = TreeRoots.SelectMany(r => r.Children);
+        while (true)
+        {
+            FolderTreeItemViewModel? next = null;
+            foreach (var item in level)
+            {
+                if (item.FullPath is null) continue;
+                var p = PathUtil.Normalize(item.FullPath);
+                if (string.Equals(p, target, StringComparison.OrdinalIgnoreCase) || PathUtil.IsUnder(target, p))
+                {
+                    next = item;
+                    break;
+                }
+            }
+            if (next is null) break;
+            match = next;
+            if (string.Equals(PathUtil.Normalize(next.FullPath!), target, StringComparison.OrdinalIgnoreCase)) break;
+            next.IsExpanded = true; // loads its children
+            level = next.Children;
+        }
+
+        // If the exact folder isn't in the tree (e.g. created after its parent was expanded), select the closest ancestor.
+        if (match is null || match == _selectedTreeItem) return;
+        _syncingTree = true;
+        try
+        {
+            if (_selectedTreeItem is not null) _selectedTreeItem.IsSelected = false;
+            match.IsSelected = true;
+            _selectedTreeItem = match;
+        }
+        finally
+        {
+            _syncingTree = false;
+        }
     }
 
     private FsNode? FindScanned(string path)
@@ -254,6 +307,9 @@ public sealed partial class MainViewModel : ObservableObject
         return sorted.ToList();
     }
 
+    private string? ParentPath() =>
+        CurrentNode?.Parent?.FullPath ?? (CurrentNode is null ? null : Path.GetDirectoryName(CurrentNode.FullPath));
+
     private void LoadDrives()
     {
         var thisPc = new FolderTreeItemViewModel("This PC", null, "", OnTreeSelected, hasChildren: false) { IsExpanded = true };
@@ -276,7 +332,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnTreeSelected(FolderTreeItemViewModel item)
     {
-        if (item.FullPath is not null) NavigateCommand.Execute(item.FullPath);
+        _selectedTreeItem = item;
+        if (!_syncingTree && item.FullPath is not null) NavigateCommand.Execute(item.FullPath);
     }
 
     private static DateTime? SafeTime(FsNode node, Func<FileSystemInfo, DateTime> pick)

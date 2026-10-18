@@ -8,16 +8,26 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:MainViewModel}"
         Title="Folder Disk Size" Width="1400" Height="850"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        PreviewMouseUp="OnPreviewMouseUp">
+    <!-- Explorer-style navigation keys. Backspace is handled in code so it still deletes text in the address bar. -->
+    <Window.InputBindings>
+        <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding GoBackCommand}" />
+        <KeyBinding Key="BrowserBack" Command="{Binding GoBackCommand}" />
+        <KeyBinding Key="Right" Modifiers="Alt" Command="{Binding GoForwardCommand}" />
+        <KeyBinding Key="BrowserForward" Command="{Binding GoForwardCommand}" />
+        <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding GoUpCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
+    </Window.InputBindings>
     <DockPanel>
 
         <!-- Navigation bar: back, forward, up, address, rescan, stop -->
         <DockPanel DockPanel.Dock="Top" Margin="4" LastChildFill="True">
-            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72B;" ToolTip="Back" Command="{Binding GoBackCommand}" />
-            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72A;" ToolTip="Forward" Command="{Binding GoForwardCommand}" />
-            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE74A;" ToolTip="Up one level" Command="{Binding GoUpCommand}" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72B;" ToolTip="Back (Alt+Left)" Command="{Binding GoBackCommand}" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72A;" ToolTip="Forward (Alt+Right)" Command="{Binding GoForwardCommand}" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE74A;" ToolTip="Up one level (Alt+Up)" Command="{Binding GoUpCommand}" />
             <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE71A;" ToolTip="Stop scan" Command="{Binding CancelScanCommand}" />
-            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE72C;" ToolTip="Rescan" Command="{Binding RescanCommand}" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE72C;" ToolTip="Rescan (F5)" Command="{Binding RescanCommand}" />
             <TextBox x:Name="AddressBox" Margin="4,0" VerticalContentAlignment="Center" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
                     <KeyBinding Key="Enter" Command="{Binding NavigateCommand}" CommandParameter="{Binding Text, ElementName=AddressBox}" />
@@ -48,7 +58,7 @@
                     <dock:LayoutAnchorablePaneGroup Orientation="Vertical" DockWidth="320">
                         <dock:LayoutAnchorablePane DockHeight="3*">
                             <dock:LayoutAnchorable Title="Folder Browser" CanClose="False" ContentId="folderBrowser">
-                                <TreeView x:Name="FolderTree" ItemsSource="{Binding TreeRoots}" BorderThickness="0">
+                                <TreeView x:Name="FolderTree" ItemsSource="{Binding TreeRoots}" BorderThickness="0" TreeViewItem.Selected="OnTreeItemSelected">
                                     <TreeView.ItemContainerStyle>
                                         <Style TargetType="TreeViewItem">
                                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
