@@ -7,10 +7,15 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>FolderDiskSize</AssemblyName>
     <RootNamespace>FolderDiskSize.App</RootNamespace>
+    <!-- Folder with a sextant, 16-256 px. Regenerate with tools/make_icon.py. -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Dirkster.AvalonDock" Version="4.74.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FolderDiskSize.Core\FolderDiskSize.Core.csproj" />

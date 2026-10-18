@@ -1,3 +1,5 @@
+using System.Windows.Media;
+using FolderDiskSize.App.Services;
 using FolderDiskSize.Core;
 using FolderDiskSize.Core.Formatting;
 
@@ -6,6 +8,9 @@ namespace FolderDiskSize.App.ViewModels;
 /// <summary>One row of the Details grid. Text columns are precomputed so scrolling stays cheap.</summary>
 public sealed class EntryViewModel
 {
+    private string? _typeName;
+    private ImageSource? _icon;
+
     public EntryViewModel(FsNode node)
     {
         Node = node;
@@ -15,7 +20,6 @@ public sealed class EntryViewModel
         FolderCountText = node.IsDirectory ? node.FolderCount.ToString("N0") : "";
         PercentText = Percent.ToString("0.00") + "%";
         AttributesText = AttributeFormatter.Format(node.Attributes);
-        TypeName = FileTypeNames.For(node);
     }
 
     public FsNode Node { get; }
@@ -35,8 +39,10 @@ public sealed class EntryViewModel
     public string FolderCountText { get; }
     public string PercentText { get; }
     public string AttributesText { get; }
-    public string TypeName { get; }
 
-    /// <summary>Segoe Fluent / MDL2 glyph: folder, link, or page.</summary>
-    public string Glyph => Node.IsReparsePoint ? "" : Node.IsDirectory ? "" : "";
+    /// <summary>Explorer's type name ("Text Document"), falling back to "TXT File" if the shell has none.</summary>
+    public string TypeName => _typeName ??= ShellIcons.TypeName(Node.Name, Node.IsDirectory) ?? FileTypeNames.For(Node);
+
+    /// <summary>The 16px Windows shell icon, loaded when the row first scrolls into view.</summary>
+    public ImageSource? Icon => _icon ??= Node.IsDirectory ? ShellIcons.ForFolder(Node.IsReparsePoint) : ShellIcons.ForFile(Node.FullPath);
 }

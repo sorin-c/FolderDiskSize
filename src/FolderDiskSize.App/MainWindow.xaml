@@ -4,10 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:FolderDiskSize.App.ViewModels"
+        xmlns:local="clr-namespace:FolderDiskSize.App"
         xmlns:dock="https://github.com/Dirkster99/AvalonDock"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:MainViewModel}"
-        Title="Folder Disk Size" Width="1400" Height="850"
+        Title="Folder Disk Size" Icon="Assets/app.ico" Width="1470" Height="850"
         WindowStartupLocation="CenterScreen"
         PreviewMouseUp="OnPreviewMouseUp">
     <!-- Explorer-style navigation keys. Backspace is handled in code so it still deletes text in the address bar. -->
@@ -21,13 +22,25 @@
     </Window.InputBindings>
     <DockPanel>
 
-        <!-- Navigation bar: back, forward, up, address, rescan, stop -->
+        <!-- Navigation bar: back, forward, up, address, rescan or stop (one spot: Stop while scanning, Rescan otherwise), options -->
         <DockPanel DockPanel.Dock="Top" Margin="4" LastChildFill="True">
             <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72B;" ToolTip="Back (Alt+Left)" Command="{Binding GoBackCommand}" />
             <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72A;" ToolTip="Forward (Alt+Right)" Command="{Binding GoForwardCommand}" />
             <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE74A;" ToolTip="Up one level (Alt+Up)" Command="{Binding GoUpCommand}" />
-            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE71A;" ToolTip="Stop scan" Command="{Binding CancelScanCommand}" />
-            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE72C;" ToolTip="Rescan (F5)" Command="{Binding RescanCommand}" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE713;" ToolTip="Options" Click="OnOptionsClick" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE71A;" ToolTip="Stop scan" Command="{Binding CancelScanCommand}"
+                    Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
+            <Button DockPanel.Dock="Right" Content="&#xE72C;" ToolTip="Rescan (F5)" Command="{Binding RescanCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource ToolButton}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
             <TextBox x:Name="AddressBox" Margin="4,0" VerticalContentAlignment="Center" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
                     <KeyBinding Key="Enter" Command="{Binding NavigateCommand}" CommandParameter="{Binding Text, ElementName=AddressBox}" />
@@ -36,17 +49,29 @@
         </DockPanel>
 
         <!-- Status bar -->
+        <!-- Status bar. The message gets all the leftover width and is cut off with "…", and the counters have
+             fixed widths, so a changing folder name or growing numbers never move the other items. -->
         <StatusBar DockPanel.Dock="Bottom">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem Grid.Column="0" HorizontalContentAlignment="Stretch">
+                <TextBlock Text="{Binding StatusText}" ToolTip="{Binding StatusText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
             </StatusBarItem>
-            <StatusBarItem HorizontalAlignment="Right">
+            <StatusBarItem Grid.Column="1">
                 <StackPanel Orientation="Horizontal">
                     <ProgressBar Width="80" Height="12" IsIndeterminate="{Binding IsScanning}" Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding ScannedFolders, StringFormat='Folders: {0:N0}'}" Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding ScannedFiles, StringFormat='Files: {0:N0}'}" Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding ElapsedText}" Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding MemoryText}" />
+                    <TextBlock Width="120" Text="{Binding ScannedFolders, StringFormat='Folders: {0:N0}'}" Margin="0,0,12,0" />
+                    <TextBlock Width="120" Text="{Binding ScannedFiles, StringFormat='Files: {0:N0}'}" Margin="0,0,12,0" />
+                    <TextBlock Width="80" Text="{Binding ElapsedText}" Margin="0,0,12,0" />
+                    <TextBlock Width="70" Text="{Binding MemoryText}" />
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
@@ -55,8 +80,8 @@
             <dock:LayoutRoot>
                 <dock:LayoutPanel Orientation="Horizontal">
 
-                    <dock:LayoutAnchorablePaneGroup Orientation="Vertical" DockWidth="320">
-                        <dock:LayoutAnchorablePane DockHeight="3*">
+                    <dock:LayoutAnchorablePaneGroup Orientation="Vertical" DockWidth="360">
+                        <dock:LayoutAnchorablePane x:Name="FolderBrowserPane" DockHeight="3*">
                             <dock:LayoutAnchorable Title="Folder Browser" CanClose="False" ContentId="folderBrowser">
                                 <TreeView x:Name="FolderTree" ItemsSource="{Binding TreeRoots}" BorderThickness="0" TreeViewItem.Selected="OnTreeItemSelected">
                                     <TreeView.ItemContainerStyle>
@@ -68,7 +93,7 @@
                                     <TreeView.ItemTemplate>
                                         <HierarchicalDataTemplate DataType="{x:Type vm:FolderTreeItemViewModel}" ItemsSource="{Binding Children}">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="#D9A520" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" />
                                                 <TextBlock Text="{Binding Name}" />
                                             </StackPanel>
                                         </HierarchicalDataTemplate>
@@ -77,17 +102,34 @@
                             </dock:LayoutAnchorable>
                         </dock:LayoutAnchorablePane>
 
-                        <dock:LayoutAnchorablePane DockHeight="2*">
+                        <!-- Sized in code to fit every drive, so it opens without scroll bars. -->
+                        <dock:LayoutAnchorablePane x:Name="DriveSpacePane" DockHeight="2*">
                             <dock:LayoutAnchorable Title="Drive Space" ContentId="driveSpace">
-                                <ListView x:Name="DriveList" ItemsSource="{Binding Drives}" BorderThickness="0">
+                                <ListView x:Name="DriveList" ItemsSource="{Binding Drives}" BorderThickness="0" MouseDoubleClick="OnDriveDoubleClick"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem">
                                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Height" Value="{x:Static local:MainWindow.DriveRowHeight}" />
                                         </Style>
                                     </ListView.ItemContainerStyle>
                                     <ListView.View>
                                         <GridView>
-                                            <GridViewColumn Header="Drive" Width="50" DisplayMemberBinding="{Binding Name}" />
+                                            <GridView.ColumnHeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader">
+                                                    <Setter Property="Height" Value="{x:Static local:MainWindow.DriveRowHeight}" />
+                                                </Style>
+                                            </GridView.ColumnHeaderContainerStyle>
+                                            <GridViewColumn Header="Drive" Width="60">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
                                             <GridViewColumn Header="Total" Width="70">
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate><TextBlock Text="{Binding TotalText}" Style="{StaticResource RightAligned}" /></DataTemplate>
@@ -108,7 +150,7 @@
                                                     <DataTemplate><TextBlock Text="{Binding FreeText}" Style="{StaticResource RightAligned}" /></DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>
-                                            <GridViewColumn Header="T" Width="24" DisplayMemberBinding="{Binding FormatLetter}" />
+                                            <GridViewColumn Header="Type" Width="60" DisplayMemberBinding="{Binding Format}" />
                                         </GridView>
                                     </ListView.View>
                                 </ListView>
@@ -116,98 +158,238 @@
                         </dock:LayoutAnchorablePane>
                     </dock:LayoutAnchorablePaneGroup>
 
-                    <dock:LayoutDocumentPane>
-                        <dock:LayoutDocument Title="Details" CanClose="False" ContentId="details">
-                            <Grid x:Name="DetailsRoot">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <DataGrid x:Name="EntriesGrid"
-                                          ItemsSource="{Binding Entries}"
-                                          SelectedItem="{Binding SelectedEntry}"
-                                          AutoGenerateColumns="False" IsReadOnly="True"
-                                          CanUserSortColumns="True" CanUserReorderColumns="True" CanUserResizeColumns="True"
-                                          SelectionMode="Extended" SelectionUnit="FullRow"
-                                          HeadersVisibility="Column" GridLinesVisibility="None"
-                                          BorderThickness="0" RowHeight="24"
-                                          Background="White" RowBackground="White"
-                                          EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                                          VirtualizingPanel.VirtualizationMode="Recycling"
-                                          VirtualizingPanel.ScrollUnit="Pixel"
-                                          Sorting="OnGridSorting"
-                                          MouseDoubleClick="OnGridDoubleClick">
-                                    <DataGrid.RowStyle>
-                                        <Style TargetType="DataGridRow">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding AccessDenied}" Value="True">
-                                                    <Setter Property="Foreground" Value="Red" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </DataGrid.RowStyle>
-                                    <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="Name" SortMemberPath="Name" Width="*" MinWidth="200">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="#D9A520" Margin="2,0,6,0" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    <!-- The main view, with no tab: drive tiles while at "This PC", the details grid for a folder. -->
+                    <dock:LayoutDocumentPane ShowHeader="False">
+                        <dock:LayoutDocument Title="Main" CanClose="False" CanFloat="False" ContentId="main">
+                            <Grid>
+                                <!-- This PC: a tile per drive; clicking one opens it in the details grid. -->
+                                <DockPanel x:Name="ComputerRoot" Background="White">
+                                    <Border DockPanel.Dock="Bottom" BorderBrush="#D5DFE5" BorderThickness="0,1,0,0" Background="#F3F6F9" Padding="10,6"
+                                            x:Name="ComputerInfoPanel">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock FontFamily="{StaticResource IconFont}" FontSize="28" Text="&#xE7F4;" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                            <StackPanel Margin="0,0,32,0">
+                                                <TextBlock Text="{Binding MachineName}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding DomainText}" />
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,32,0">
+                                                <TextBlock Text="{Binding ProcessorsText}" />
+                                                <TextBlock Text="{Binding MemoryText}" />
+                                            </StackPanel>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding UserText}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <ListBox x:Name="DriveTiles" ItemsSource="{Binding Drives}" BorderThickness="0" Padding="12"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             PreviewMouseLeftButtonUp="OnDriveTileClick" PreviewKeyDown="OnDriveTileKeyDown">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Margin" Value="4" />
+                                                <Setter Property="Padding" Value="8" />
+                                                <Setter Property="Cursor" Value="Hand" />
+                                                <Setter Property="ToolTip" Value="Open in Details" />
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:DriveViewModel}">
+                                                <Grid Width="320">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Image Source="{Binding LargeIcon}" Width="32" Height="32" VerticalAlignment="Top" Margin="0,2,10,0" />
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding TileTitle}" FontSize="14" Foreground="#1F4E79" TextTrimming="CharacterEllipsis" />
+                                                        <ProgressBar x:Name="UsedBar" Style="{StaticResource PercentBar}" Value="{Binding UsedPercent, Mode=OneWay}" Height="16" Margin="0,4" />
+                                                        <TextBlock Text="{Binding FreeOfTotalText}" Foreground="#555" />
+                                                        <TextBlock Text="{Binding FileSystemText}" Foreground="#555" />
                                                     </StackPanel>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn x:Name="SizeColumn" Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="90" ElementStyle="{StaticResource RightAligned}" SortDirection="Descending" />
-                                        <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" SortMemberPath="Allocated" Width="90" ElementStyle="{StaticResource RightAligned}" />
-                                        <DataGridTextColumn Header="Files" Binding="{Binding FileCountText}" SortMemberPath="FileCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
-                                        <DataGridTextColumn Header="Folders" Binding="{Binding FolderCountText}" SortMemberPath="FolderCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
-                                        <DataGridTextColumn Header="Modified" Binding="{Binding Modified, StringFormat=g}" SortMemberPath="Modified" Width="130" />
-                                        <DataGridTemplateColumn Header="% Parent" SortMemberPath="Percent" Width="90">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="2,2">
-                                                        <ProgressBar Style="{StaticResource PercentBar}" Value="{Binding Percent, Mode=OneWay}" />
-                                                        <TextBlock Text="{Binding PercentText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="Attribs" Binding="{Binding AttributesText}" SortMemberPath="AttributesText" Width="60" />
-                                        <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" SortMemberPath="TypeName" Width="110" />
-                                    </DataGrid.Columns>
-                                </DataGrid>
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsAlmostFull}" Value="True">
+                                                        <Setter TargetName="UsedBar" Property="Foreground" Value="#E8807A" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
 
-                                <!-- Info panel for the selected row (or the current folder when nothing is selected) -->
-                                <Border Grid.Row="1" BorderBrush="#D5DFE5" BorderThickness="0,1,0,0" Background="#F3F6F9" Padding="10,6">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="2*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" FontFamily="{StaticResource IconFont}" FontSize="28" Text="&#xEDA2;" Margin="0,0,12,0" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{Binding DetailsName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding DetailsType}" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="{Binding DetailsCounts}" />
-                                            <TextBlock Text="{Binding DetailsSize}" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="3">
-                                            <TextBlock Text="{Binding DetailsCreated}" />
-                                            <TextBlock Text="{Binding DetailsModified}" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="4">
-                                            <TextBlock Text="{Binding DetailsAccessed}" />
-                                            <TextBlock Text="{Binding DetailsAttributes}" />
-                                            <TextBlock Text="{Binding DetailsPercent}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                <Grid x:Name="DetailsRoot" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <DataGrid x:Name="EntriesGrid"
+                                              ItemsSource="{Binding Entries}"
+                                              FocusVisualStyle="{x:Null}"
+                                              SelectedItem="{Binding SelectedEntry}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              CanUserSortColumns="True" CanUserReorderColumns="True" CanUserResizeColumns="True"
+                                              SelectionMode="Extended" SelectionUnit="FullRow"
+                                              HeadersVisibility="Column" GridLinesVisibility="None"
+                                              BorderThickness="0" RowHeight="24"
+                                              Background="White" RowBackground="White"
+                                              EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                                              VirtualizingPanel.VirtualizationMode="Recycling"
+                                              VirtualizingPanel.ScrollUnit="Pixel"
+                                              ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                              Sorting="OnGridSorting"
+                                              PreviewKeyDown="OnGridPreviewKeyDown"
+                                              PreviewTextInput="OnGridPreviewTextInput"
+                                              MouseDoubleClick="OnGridDoubleClick">
+                                        <!-- No focus rectangle on the current cell; the whole row is highlighted instead, like Explorer. -->
+                                        <DataGrid.CellStyle>
+                                            <Style TargetType="DataGridCell">
+                                                <Setter Property="BorderThickness" Value="0" />
+                                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                                <Style.Triggers>
+                                                    <!-- A right-click menu takes keyboard focus, which would turn the selection grey; keep it blue while a menu is open.
+                                                         The grid's Tag is set to "MenuOpen" in code while one is showing. -->
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
+                                                            <Condition Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="MenuOpen" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGrid.CellStyle>
+                                        <DataGrid.Resources>
+                                            <!-- Right-click menu for a row. The column header keeps its own menu (show/hide columns). -->
+                                            <ContextMenu x:Key="RowMenu" x:Shared="False">
+                                                <MenuItem Header="_Open" FontWeight="Bold" Click="OnRowMenuOpen" />
+                                                <MenuItem Header="Open in _Explorer" Click="OnRowMenuShowInExplorer" />
+                                                <Separator />
+                                                <MenuItem Header="Copy _path" Click="OnRowMenuCopyPath" />
+                                                <!-- Folders only; links aren't followed, so there is nothing to rescan. -->
+                                                <MenuItem Header="Re_scan" Click="OnRowMenuRescan"
+                                                          Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                                                    <MenuItem.Style>
+                                                        <Style TargetType="MenuItem">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Node.IsReparsePoint}" Value="True">
+                                                                    <Setter Property="IsEnabled" Value="False" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </MenuItem.Style>
+                                                </MenuItem>
+                                                <Separator />
+                                                <MenuItem Header="_Delete" InputGestureText="Del" Click="OnRowMenuDelete" />
+                                                <Separator />
+                                                <MenuItem Header="P_roperties" Click="OnRowMenuProperties" />
+                                            </ContextMenu>
+                                        </DataGrid.Resources>
+                                        <DataGrid.RowStyle>
+                                            <Style TargetType="DataGridRow">
+                                                <Setter Property="ContextMenu" Value="{StaticResource RowMenu}" />
+                                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AccessDenied}" Value="True">
+                                                        <Setter Property="Foreground" Value="Red" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGrid.RowStyle>
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Name" SortMemberPath="Name" Width="*" MinWidth="200">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Image Source="{Binding Icon}" Width="16" Height="16" Margin="2,0,6,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn x:Name="SizeColumn" Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="90" ElementStyle="{StaticResource RightAligned}" SortDirection="Descending" />
+                                            <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" SortMemberPath="Allocated" Width="90" ElementStyle="{StaticResource RightAligned}" />
+                                            <DataGridTextColumn Header="Files" Binding="{Binding FileCountText}" SortMemberPath="FileCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
+                                            <DataGridTextColumn Header="Folders" Binding="{Binding FolderCountText}" SortMemberPath="FolderCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
+                                            <DataGridTextColumn Header="Modified" Binding="{Binding Modified, StringFormat=g}" SortMemberPath="Modified" Width="130" ElementStyle="{StaticResource CellText}" />
+                                            <DataGridTemplateColumn Header="% Parent" SortMemberPath="Percent" Width="90">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="2,2">
+                                                            <ProgressBar Style="{StaticResource PercentBar}" Value="{Binding Percent, Mode=OneWay}" />
+                                                            <!-- Always black: the text sits on the bar, so the selected row's white text would vanish. -->
+                                                            <TextBlock Text="{Binding PercentText}" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Attribs" Binding="{Binding AttributesText}" SortMemberPath="AttributesText" Width="60" ElementStyle="{StaticResource CellText}" />
+                                            <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" SortMemberPath="TypeName" Width="110" ElementStyle="{StaticResource CellText}" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- Spinner over the empty grid while a folder is being scanned -->
+                                    <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                                                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+                                        <Path Width="32" Height="32" HorizontalAlignment="Center" Stroke="#3A7BD5" StrokeThickness="3"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Data="M 16,3 A 13,13 0 1 1 3,16" RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <RotateTransform />
+                                            </Path.RenderTransform>
+                                            <Path.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                             From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Path.Triggers>
+                                        </Path>
+                                        <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="#666"
+                                                   Text="{Binding ScannedFiles, StringFormat='Loading… {0:N0} files'}" />
+                                    </StackPanel>
+
+                                    <!-- Info panel for the selected row (or the current folder when nothing is selected) -->
+                                    <Border Grid.Row="1" BorderBrush="#D5DFE5" BorderThickness="0,1,0,0" Background="#F3F6F9" Padding="10,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" FontFamily="{StaticResource IconFont}" FontSize="28" Text="&#xEDA2;" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding DetailsName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DetailsType}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="{Binding DetailsCounts}" />
+                                                <TextBlock Text="{Binding DetailsSize}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3">
+                                                <TextBlock Text="{Binding DetailsCreated}" />
+                                                <TextBlock Text="{Binding DetailsModified}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="4">
+                                                <TextBlock Text="{Binding DetailsAccessed}" />
+                                                <TextBlock Text="{Binding DetailsAttributes}" />
+                                                <TextBlock Text="{Binding DetailsPercent}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </dock:LayoutDocument>
                     </dock:LayoutDocumentPane>

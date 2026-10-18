@@ -21,6 +21,12 @@ public sealed class FileSystemScanner(IAllocationSizeProvider allocation) : IDis
 
     public FileSystemScanner() : this(AllocationSizeProvider.CreateDefault()) { }
 
+    /// <summary>
+    /// Also scan inside junctions and symbolic links. Only links that point outside the folder being
+    /// scanned are followed, and each target once, so nothing is counted twice and loops can't happen.
+    /// </summary>
+    public bool FollowReparsePoints { get; set; }
+
     public Task<FsNode> ScanAsync(string path, IProgress<ScanProgress>? progress = null, CancellationToken cancellationToken = default) =>
         Task.Run(() => Scan(path, progress, cancellationToken), cancellationToken);
 
@@ -29,7 +35,7 @@ public sealed class FileSystemScanner(IAllocationSizeProvider allocation) : IDis
         var info = new DirectoryInfo(PathUtil.Normalize(path));
         if (!info.Exists) throw new DirectoryNotFoundException(path);
 
-        var state = new ScanState(ct);
+        var state = new ScanState(ct, PathUtil.Normalize(info.FullName));
         var root = new FsNode(DisplayName(info), info.FullName, isDirectory: true, parent: null)
         {
             LastWriteTime = info.LastWriteTime,
@@ -61,7 +67,7 @@ public sealed class FileSystemScanner(IAllocationSizeProvider allocation) : IDis
                         Attributes = dir.Attributes,
                     };
                     children.Add(child);
-                    if (!child.IsReparsePoint) subdirs.Add(child);
+                    if (!child.IsReparsePoint || ShouldFollow(dir, state)) subdirs.Add(child);
                     Interlocked.Increment(ref state.Folders);
                 }
                 else if (entry is FileInfo file)
@@ -116,6 +122,23 @@ public sealed class FileSystemScanner(IAllocationSizeProvider allocation) : IDis
         node.SetChildren(children);
     }
 
+    private bool ShouldFollow(DirectoryInfo link, ScanState state)
+    {
+        if (!FollowReparsePoints) return false;
+        try
+        {
+            if (link.ResolveLinkTarget(returnFinalTarget: true) is not DirectoryInfo { Exists: true } target) return false;
+            var path = PathUtil.Normalize(target.FullName);
+            var insideScan = string.Equals(path, state.Root, StringComparison.OrdinalIgnoreCase) || PathUtil.IsUnder(path, state.Root)
+                             || PathUtil.IsUnder(state.Root, path);
+            return !insideScan && state.FollowedTargets.TryAdd(path, 0);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private long SafeAllocated(FileInfo file)
     {
         try { return allocation.GetAllocatedSize(file); }
@@ -125,8 +148,10 @@ public sealed class FileSystemScanner(IAllocationSizeProvider allocation) : IDis
     private static string DisplayName(DirectoryInfo info) =>
         info.Parent is null ? info.FullName : info.Name;
 
-    private sealed class ScanState(CancellationToken token)
+    private sealed class ScanState(CancellationToken token, string root)
     {
+        public readonly string Root = root;
+        public readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> FollowedTargets = new(StringComparer.OrdinalIgnoreCase);
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         public readonly CancellationToken Token = token;
         public long Files;

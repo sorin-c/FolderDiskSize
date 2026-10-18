@@ -56,6 +56,51 @@ public sealed class ScannerTests : IDisposable
     }
 
     [Fact]
+    public async Task ReplaceChild_updates_totals_up_the_tree()
+    {
+        WriteFile("a.bin", 100);
+        WriteFile("sub/deep/b.bin", 1000);
+        var root = await _scanner.ScanAsync(_root);
+        var sub = root.Children.Single(c => c.Name == "sub");
+
+        WriteFile("sub/deep/c.bin", 500);
+        WriteFile("sub/new/d.bin", 50);
+        var fresh = await _scanner.ScanAsync(Path.Combine(_root, "sub"));
+
+        Assert.True(sub.Parent!.ReplaceChild(sub, fresh));
+        Assert.Same(root, fresh.Parent);
+        Assert.Contains(fresh, root.Children);
+        Assert.Equal(1650, root.Size);
+        Assert.Equal(4, root.FileCount);
+        Assert.Equal(3, root.FolderCount);
+        Assert.False(root.ReplaceChild(sub, fresh));
+    }
+
+    [Fact]
+    public async Task RemoveChild_subtracts_totals_up_the_tree()
+    {
+        WriteFile("a.bin", 100);
+        WriteFile("sub/deep/b.bin", 1000);
+        WriteFile("sub/c.bin", 10);
+        var root = await _scanner.ScanAsync(_root);
+        var sub = root.Children.Single(c => c.Name == "sub");
+        var deep = sub.Children.Single(c => c.Name == "deep");
+        var c = sub.Children.Single(n => n.Name == "c.bin");
+
+        Assert.True(sub.RemoveChild(c));
+        Assert.Equal(1100, root.Size);
+        Assert.Equal(2, root.FileCount);
+
+        Assert.True(sub.RemoveChild(deep));
+        Assert.Equal(100, root.Size);
+        Assert.Equal(1, root.FileCount);
+        Assert.Equal(1, root.FolderCount);
+        Assert.Equal(0, sub.Size);
+        Assert.Null(deep.Parent);
+        Assert.False(sub.RemoveChild(deep));
+    }
+
+    [Fact]
     public async Task Does_not_follow_symlinked_folders()
     {
         WriteFile("real/file.bin", 1000);
@@ -98,5 +143,29 @@ public sealed class ScannerTests : IDisposable
     {
         private readonly object _gate = new();
         public void Report(ScanProgress value) { lock (_gate) report(value); }
+    }
+
+    [Fact]
+    public async Task Follows_links_to_outside_folders_when_enabled()
+    {
+        var outside = Directory.CreateTempSubdirectory("fds-target-").FullName;
+        try
+        {
+            File.WriteAllBytes(Path.Combine(outside, "data.bin"), new byte[700]);
+            WriteFile("local.bin", 100);
+            Directory.CreateSymbolicLink(Path.Combine(_root, "out"), outside);
+            Directory.CreateSymbolicLink(Path.Combine(_root, "self"), _root); // would loop if followed
+
+            var scanner = new FileSystemScanner(new ClusterRoundingAllocationProvider(4096)) { FollowReparsePoints = true };
+            var root = await scanner.ScanAsync(_root);
+
+            Assert.Equal(800, root.Size);
+            Assert.Equal(700, root.Children.Single(c => c.Name == "out").Size);
+            Assert.Empty(root.Children.Single(c => c.Name == "self").Children);
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
     }
 }

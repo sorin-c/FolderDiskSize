@@ -50,6 +50,53 @@ public sealed class FsNode
 
     internal void SetChildren(List<FsNode> children) => _children = children;
 
+    /// <summary>
+    /// Swaps a child for a fresh scan of it and updates the totals of this folder and every folder above it.
+    /// Returns false if <paramref name="old"/> is not one of this folder's children.
+    /// </summary>
+    public bool ReplaceChild(FsNode old, FsNode replacement)
+    {
+        var index = _children?.IndexOf(old) ?? -1;
+        if (index < 0) return false;
+        _children![index] = replacement;
+        replacement.Parent = this;
+        old.Parent = null;
+
+        var size = replacement.Size - old.Size;
+        var allocated = replacement.Allocated - old.Allocated;
+        var files = replacement.FileCount - old.FileCount;
+        var folders = replacement.FolderCount - old.FolderCount;
+        for (var node = this; node is not null; node = node.Parent)
+        {
+            node.Size += size;
+            node.Allocated += allocated;
+            node.FileCount += files;
+            node.FolderCount += folders;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Takes a deleted child out of this folder and subtracts it from the totals of this folder and every folder above it.
+    /// Returns false if <paramref name="child"/> is not one of this folder's children.
+    /// </summary>
+    public bool RemoveChild(FsNode child)
+    {
+        if (_children is null || !_children.Remove(child)) return false;
+        child.Parent = null;
+
+        var files = child.IsDirectory ? child.FileCount : 1;
+        var folders = child.IsDirectory ? child.FolderCount + 1 : 0;
+        for (var node = this; node is not null; node = node.Parent)
+        {
+            node.Size -= child.Size;
+            node.Allocated -= child.Allocated;
+            node.FileCount -= files;
+            node.FolderCount -= folders;
+        }
+        return true;
+    }
+
     /// <summary>Finds a descendant (or this node) by full path, case-insensitively.</summary>
     public FsNode? Find(string path)
     {

@@ -4,5 +4,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Release builds keep symbols inside the DLL/exe, so the published folder has no .pdb files. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
+  </PropertyGroup>
+  <!-- Release version for every project. Bump it here (or pass -Version to publish.ps1). -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Product>Folder Disk Size</Product>
+    <Description>Windows disk usage explorer.</Description>
   </PropertyGroup>
 </Project>
