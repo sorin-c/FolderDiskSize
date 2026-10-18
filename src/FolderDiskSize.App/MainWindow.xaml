@@ -132,6 +132,7 @@
                                           SelectionMode="Extended" SelectionUnit="FullRow"
                                           HeadersVisibility="Column" GridLinesVisibility="None"
                                           BorderThickness="0" RowHeight="24"
+                                          Background="White" RowBackground="White"
                                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
                                           VirtualizingPanel.VirtualizationMode="Recycling"
                                           VirtualizingPanel.ScrollUnit="Pixel"
