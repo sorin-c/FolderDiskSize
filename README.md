@@ -13,8 +13,6 @@ Each release on GitHub has two zips for 64-bit Windows. Unzip either one and run
 
 To get the runtime for the smaller zip, open the [.NET 10 download page](https://dotnet.microsoft.com/download/dotnet/10.0) and, under **.NET Desktop Runtime 10.0**, download the **Windows x64** installer. The plain ".NET Runtime" and "ASP.NET Core Runtime" don't include WPF, so the app won't start with only those. If the runtime is missing, Windows shows a message with a download link when you start the app.
 
-Each zip has a `.sha256` file next to it with its SHA-256 checksum.
-
 ## What's here
 
 | Project | Target | What it does |
