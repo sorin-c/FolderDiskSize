@@ -318,7 +318,7 @@
                                             <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" SortMemberPath="Allocated" Width="90" ElementStyle="{StaticResource RightAligned}" />
                                             <DataGridTextColumn Header="Files" Binding="{Binding FileCountText}" SortMemberPath="FileCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
                                             <DataGridTextColumn Header="Folders" Binding="{Binding FolderCountText}" SortMemberPath="FolderCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
-                                            <DataGridTextColumn Header="Modified" Binding="{Binding Modified, StringFormat=g}" SortMemberPath="Modified" Width="130" ElementStyle="{StaticResource CellText}" />
+                                            <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedText}" SortMemberPath="Modified" Width="130" ElementStyle="{StaticResource CellText}" />
                                             <DataGridTemplateColumn Header="% Parent" SortMemberPath="Percent" Width="90">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>

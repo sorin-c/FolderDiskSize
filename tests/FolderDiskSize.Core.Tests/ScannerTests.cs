@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FolderDiskSize.Core;
 using FolderDiskSize.Core.Scanning;
 
@@ -8,13 +9,47 @@ public sealed class ScannerTests : IDisposable
     private readonly string _root = Directory.CreateTempSubdirectory("fds-test-").FullName;
     private readonly FileSystemScanner _scanner = new(new ClusterRoundingAllocationProvider(4096));
 
-    public void Dispose() => Directory.Delete(_root, recursive: true);
+    public void Dispose() => DeleteTree(_root);
+
+    /// <summary>
+    /// Removes links before the recursive delete: on Windows, Directory.Delete(recursive) fails with
+    /// "Access denied" on a junction, so each link is deleted on its own first.
+    /// </summary>
+    private static void DeleteTree(string path)
+    {
+        foreach (var dir in new DirectoryInfo(path).EnumerateDirectories())
+        {
+            if (dir.Attributes.HasFlag(FileAttributes.ReparsePoint)) dir.Delete();
+            else DeleteTree(dir.FullName);
+        }
+        Directory.Delete(path, recursive: true);
+    }
 
     private void WriteFile(string relative, int length)
     {
         var path = Path.Combine(_root, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, new byte[length]);
+    }
+
+    /// <summary>
+    /// Symlinks need admin or Developer Mode on Windows, so fall back to a junction there,
+    /// which any user can create and the scanner treats the same way.
+    /// </summary>
+    private static void CreateFolderLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+        catch (Exception e) when (OperatingSystem.IsWindows() && e is IOException or UnauthorizedAccessException)
+        {
+            var mklink = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
+            foreach (var arg in new[] { "/c", "mklink", "/J", link, target }) mklink.ArgumentList.Add(arg);
+            using var process = Process.Start(mklink)!;
+            process.WaitForExit();
+            if (process.ExitCode != 0) throw new IOException($"mklink /J failed for {link}", e);
+        }
     }
 
     [Fact]
@@ -104,7 +139,7 @@ public sealed class ScannerTests : IDisposable
     public async Task Does_not_follow_symlinked_folders()
     {
         WriteFile("real/file.bin", 1000);
-        Directory.CreateSymbolicLink(Path.Combine(_root, "link"), Path.Combine(_root, "real"));
+        CreateFolderLink(Path.Combine(_root, "link"), Path.Combine(_root, "real"));
 
         var root = await _scanner.ScanAsync(_root);
 
@@ -153,8 +188,8 @@ public sealed class ScannerTests : IDisposable
         {
             File.WriteAllBytes(Path.Combine(outside, "data.bin"), new byte[700]);
             WriteFile("local.bin", 100);
-            Directory.CreateSymbolicLink(Path.Combine(_root, "out"), outside);
-            Directory.CreateSymbolicLink(Path.Combine(_root, "self"), _root); // would loop if followed
+            CreateFolderLink(Path.Combine(_root, "out"), outside);
+            CreateFolderLink(Path.Combine(_root, "self"), _root); // would loop if followed
 
             var scanner = new FileSystemScanner(new ClusterRoundingAllocationProvider(4096)) { FollowReparsePoints = true };
             var root = await scanner.ScanAsync(_root);

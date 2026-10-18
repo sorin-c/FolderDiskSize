@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Media;
 using FolderDiskSize.App.Services;
 using FolderDiskSize.Core;
@@ -20,6 +21,8 @@ public sealed class EntryViewModel
         FolderCountText = node.IsDirectory ? node.FolderCount.ToString("N0") : "";
         PercentText = Percent.ToString("0.00") + "%";
         AttributesText = AttributeFormatter.Format(node.Attributes);
+        // CurrentCulture carries the short date and time formats set in Windows; WPF bindings would use en-US.
+        ModifiedText = node.LastWriteTime.ToString("g", CultureInfo.CurrentCulture);
     }
 
     public FsNode Node { get; }
@@ -39,6 +42,7 @@ public sealed class EntryViewModel
     public string FolderCountText { get; }
     public string PercentText { get; }
     public string AttributesText { get; }
+    public string ModifiedText { get; }
 
     /// <summary>Explorer's type name ("Text Document"), falling back to "TXT File" if the shell has none.</summary>
     public string TypeName => _typeName ??= ShellIcons.TypeName(Node.Name, Node.IsDirectory) ?? FileTypeNames.For(Node);
