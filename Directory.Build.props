@@ -9,7 +9,7 @@
   </PropertyGroup>
   <!-- Release version for every project. Bump it here (or pass -Version to publish.ps1). -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>Folder Disk Size</Product>
     <Description>Windows disk usage explorer.</Description>
   </PropertyGroup>

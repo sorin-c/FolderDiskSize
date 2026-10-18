@@ -18,17 +18,6 @@ dotnet run --project src/FolderDiskSize.App
 
 Needs the .NET 10 SDK. Open `FolderDiskSize.slnx` in Visual Studio 2026 or Rider to debug.
 
-## Make a release
-
-1. Set the version in `Directory.Build.props` (`<Version>`), for example `0.2.0`.
-2. Run `powershell -ExecutionPolicy Bypass -File .\publish.ps1` from the repo root. It runs the tests, then publishes two builds with the profiles in `src/FolderDiskSize.App/Properties/PublishProfiles`:
-   - `FolderDiskSize-<version>-win-x64-standalone.zip` (about 56 MB): self-contained, runs on any 64-bit Windows PC without .NET installed.
-   - `FolderDiskSize-<version>-win-x64-requires-dotnet.zip` (about 0.5 MB): needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0); if it's missing, Windows offers the download when the app starts.
-3. Output goes to `artifacts\` (ignored by git): each build's folder with its exe, a zip of it, and the zip's SHA-256.
-4. Start each exe once to check it, then commit, tag (`git tag v0.2.0`, `git push origin v0.2.0`) and create a GitHub release from the tag with both zips attached. With the GitHub CLI: `gh release create v0.2.0 (Get-ChildItem artifacts\*.zip) --generate-notes`.
-
-`-Version 0.2.0` overrides the version for one build; `-SkipTests` skips the tests. The exes aren't code-signed, so SmartScreen will warn on other PCs.
-
 ## How the view works
 
 - **Folder Browser**: "This PC" lists the ready drives. Folders load from disk as you expand them. Selecting one scans it (the first time) and fills the grid.
