@@ -1,0 +1,208 @@
+<Window x:Class="FolderDiskSize.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:FolderDiskSize.App.ViewModels"
+        xmlns:dock="https://github.com/Dirkster99/AvalonDock"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance vm:MainViewModel}"
+        Title="Folder Disk Size" Width="1400" Height="850"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+
+        <!-- Navigation bar: back, forward, up, address, rescan, stop -->
+        <DockPanel DockPanel.Dock="Top" Margin="4" LastChildFill="True">
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72B;" ToolTip="Back" Command="{Binding GoBackCommand}" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE72A;" ToolTip="Forward" Command="{Binding GoForwardCommand}" />
+            <Button DockPanel.Dock="Left" Style="{StaticResource ToolButton}" Content="&#xE74A;" ToolTip="Up one level" Command="{Binding GoUpCommand}" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE71A;" ToolTip="Stop scan" Command="{Binding CancelScanCommand}" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="&#xE72C;" ToolTip="Rescan" Command="{Binding RescanCommand}" />
+            <TextBox x:Name="AddressBox" Margin="4,0" VerticalContentAlignment="Center" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Enter" Command="{Binding NavigateCommand}" CommandParameter="{Binding Text, ElementName=AddressBox}" />
+                </TextBox.InputBindings>
+            </TextBox>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <ProgressBar Width="80" Height="12" IsIndeterminate="{Binding IsScanning}" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding ScannedFolders, StringFormat='Folders: {0:N0}'}" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding ScannedFiles, StringFormat='Files: {0:N0}'}" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding ElapsedText}" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding MemoryText}" />
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
+
+        <dock:DockingManager x:Name="Docking">
+            <dock:LayoutRoot>
+                <dock:LayoutPanel Orientation="Horizontal">
+
+                    <dock:LayoutAnchorablePaneGroup Orientation="Vertical" DockWidth="320">
+                        <dock:LayoutAnchorablePane DockHeight="3*">
+                            <dock:LayoutAnchorable Title="Folder Browser" CanClose="False" ContentId="folderBrowser">
+                                <TreeView x:Name="FolderTree" ItemsSource="{Binding TreeRoots}" BorderThickness="0">
+                                    <TreeView.ItemContainerStyle>
+                                        <Style TargetType="TreeViewItem">
+                                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                        </Style>
+                                    </TreeView.ItemContainerStyle>
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate DataType="{x:Type vm:FolderTreeItemViewModel}" ItemsSource="{Binding Children}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="#D9A520" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Name}" />
+                                            </StackPanel>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
+                            </dock:LayoutAnchorable>
+                        </dock:LayoutAnchorablePane>
+
+                        <dock:LayoutAnchorablePane DockHeight="2*">
+                            <dock:LayoutAnchorable Title="Drive Space" ContentId="driveSpace">
+                                <ListView x:Name="DriveList" ItemsSource="{Binding Drives}" BorderThickness="0">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Drive" Width="50" DisplayMemberBinding="{Binding Name}" />
+                                            <GridViewColumn Header="Total" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate><TextBlock Text="{Binding TotalText}" Style="{StaticResource RightAligned}" /></DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Used %" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <ProgressBar Style="{StaticResource PercentBar}" Value="{Binding UsedPercent, Mode=OneWay}" />
+                                                            <TextBlock Text="{Binding UsedPercentText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Free" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate><TextBlock Text="{Binding FreeText}" Style="{StaticResource RightAligned}" /></DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="T" Width="24" DisplayMemberBinding="{Binding FormatLetter}" />
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </dock:LayoutAnchorable>
+                        </dock:LayoutAnchorablePane>
+                    </dock:LayoutAnchorablePaneGroup>
+
+                    <dock:LayoutDocumentPane>
+                        <dock:LayoutDocument Title="Details" CanClose="False" ContentId="details">
+                            <Grid x:Name="DetailsRoot">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <DataGrid x:Name="EntriesGrid"
+                                          ItemsSource="{Binding Entries}"
+                                          SelectedItem="{Binding SelectedEntry}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          CanUserSortColumns="True" CanUserReorderColumns="True" CanUserResizeColumns="True"
+                                          SelectionMode="Extended" SelectionUnit="FullRow"
+                                          HeadersVisibility="Column" GridLinesVisibility="None"
+                                          BorderThickness="0" RowHeight="24"
+                                          EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                                          VirtualizingPanel.VirtualizationMode="Recycling"
+                                          VirtualizingPanel.ScrollUnit="Pixel"
+                                          Sorting="OnGridSorting"
+                                          MouseDoubleClick="OnGridDoubleClick">
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding AccessDenied}" Value="True">
+                                                    <Setter Property="Foreground" Value="Red" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Name" SortMemberPath="Name" Width="*" MinWidth="200">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="#D9A520" Margin="2,0,6,0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn x:Name="SizeColumn" Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="90" ElementStyle="{StaticResource RightAligned}" SortDirection="Descending" />
+                                        <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" SortMemberPath="Allocated" Width="90" ElementStyle="{StaticResource RightAligned}" />
+                                        <DataGridTextColumn Header="Files" Binding="{Binding FileCountText}" SortMemberPath="FileCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
+                                        <DataGridTextColumn Header="Folders" Binding="{Binding FolderCountText}" SortMemberPath="FolderCount" Width="80" ElementStyle="{StaticResource RightAligned}" />
+                                        <DataGridTextColumn Header="Modified" Binding="{Binding Modified, StringFormat=g}" SortMemberPath="Modified" Width="130" />
+                                        <DataGridTemplateColumn Header="% Parent" SortMemberPath="Percent" Width="90">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="2,2">
+                                                        <ProgressBar Style="{StaticResource PercentBar}" Value="{Binding Percent, Mode=OneWay}" />
+                                                        <TextBlock Text="{Binding PercentText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Attribs" Binding="{Binding AttributesText}" SortMemberPath="AttributesText" Width="60" />
+                                        <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" SortMemberPath="TypeName" Width="110" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Info panel for the selected row (or the current folder when nothing is selected) -->
+                                <Border Grid.Row="1" BorderBrush="#D5DFE5" BorderThickness="0,1,0,0" Background="#F3F6F9" Padding="10,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="2*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" FontFamily="{StaticResource IconFont}" FontSize="28" Text="&#xEDA2;" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding DetailsName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DetailsType}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{Binding DetailsCounts}" />
+                                            <TextBlock Text="{Binding DetailsSize}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3">
+                                            <TextBlock Text="{Binding DetailsCreated}" />
+                                            <TextBlock Text="{Binding DetailsModified}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="{Binding DetailsAccessed}" />
+                                            <TextBlock Text="{Binding DetailsAttributes}" />
+                                            <TextBlock Text="{Binding DetailsPercent}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </dock:LayoutDocument>
+                    </dock:LayoutDocumentPane>
+
+                </dock:LayoutPanel>
+            </dock:LayoutRoot>
+        </dock:DockingManager>
+    </DockPanel>
+</Window>
